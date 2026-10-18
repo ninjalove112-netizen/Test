@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Falcons AI — Age Estimator</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;font-family:Arial,sans-serif;background:#0b1020;color:#f4f6ff;padding:20px 14px}
+.container{max-width:650px;margin:20px auto}
+header{text-align:center;margin-bottom:24px}
+.logo{font-size:38px}
+h1{font-size:28px;margin:8px 0}
+.subtitle{color:#9ba6c5;line-height:1.6}
+.card{background:#151c30;border:1px solid #29334d;padding:20px;border-radius:16px;margin-bottom:16px}
+h2{font-size:17px;margin-top:0}
+label{display:block;margin:15px 0 8px;color:#dce3f8;font-size:14px}
+input[type=password],input[type=text]{width:100%;padding:13px;border:1px solid #364260;border-radius:9px;background:#0d1426;color:white;font-size:14px}
+button{cursor:pointer;border:0;border-radius:9px;padding:13px 16px;font-size:14px;font-weight:bold}
+.primary{width:100%;background:#8b7bff;color:white;margin-top:18px}
+.primary:disabled{opacity:.55}
+.secondary{background:#26314b;color:white;margin-top:10px}
+.upload{border:2px dashed #465373;border-radius:12px;padding:22px 10px;text-align:center;background:#10182b}
+.upload input{max-width:100%;margin-top:12px}
+#preview{display:none;width:100%;max-height:320px;object-fit:contain;border-radius:12px;margin-top:16px;background:#0b1020}
+.muted{color:#9ba6c5;font-size:12px;line-height:1.6}
+#status{margin-top:14px;font-size:14px;overflow-wrap:anywhere;white-space:pre-wrap;line-height:1.6}
+.result{font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere;background:#0b1222;padding:14px;border-radius:10px;max-height:400px;overflow:auto}
+.hidden{display:none}
+footer{text-align:center;color:#7885a7;font-size:12px;line-height:1.7;padding:14px}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+  <div class="logo">🔎</div>
+  <h1>Age Estimator</h1>
+  <p class="subtitle">Powered by Falcons AI API<br>Upload an image and test age estimation.</p>
+</header>
+
+<section class="card">
+  <h2>01 — API Configuration</h2>
+  <label for="apiKey">Falcons API Key</label>
+  <input id="apiKey" type="password" placeholder="Enter your API key" autocomplete="off" spellcheck="false">
+  <button class="secondary" id="toggleKey" type="button">Show API key</button>
+  <p class="muted">The key is used only for the request and is not saved by this page. Do not share or publish this file with a real key embedded in it.</p>
+</section>
+
+<section class="card">
+  <h2>02 — Upload Image</h2>
+  <div class="upload">
+    <div style="font-size:32px">📷</div>
+    <p>Choose an image to analyze</p>
+    <input type="file" id="imageFile" accept="image/*">
+  </div>
+  <img id="preview" alt="Selected image preview">
+  <p class="muted">Use an image you have permission to analyze. Age estimates can be inaccurate.</p>
+  <button class="primary" id="analyzeBtn" type="button">Estimate Age</button>
+  <div id="status" role="status" aria-live="polite"></div>
+</section>
+
+<section class="card hidden" id="resultsCard">
+  <h2>03 — API Response</h2>
+  <div id="result" class="result"></div>
+  <button class="secondary" id="copyBtn" type="button">Copy response</button>
+</section>
+
+<section class="card">
+  <h2>04 — Troubleshooting</h2>
+  <p class="muted">If the request fails, this page now shows the error name and message. Browser errors such as “Failed to fetch” can be caused by CORS, network/DNS/TLS issues, or an unavailable server; the browser may not reveal which one.</p>
+</section>
+
+<footer>Falcons AI Age Estimation Tester<br>The image and API key are sent to the Falcons API when you press Estimate Age.</footer>
+</div>
+
+<script>
+"use strict";
+const API_URL = "https://apis.falcons.ai/api/age/";
+const apiKeyInput = document.getElementById("apiKey");
+const imageInput = document.getElementById("imageFile");
+const preview = document.getElementById("preview");
+const analyzeBtn = document.getElementById("analyzeBtn");
+const statusBox = document.getElementById("status");
+const resultsCard = document.getElementById("resultsCard");
+const resultBox = document.getElementById("result");
+let selectedFile = null;
+let imagePreviewUrl = null;
+let latestResponse = "";
+
+document.getElementById("toggleKey").addEventListener("click", () => {
+  const showing = apiKeyInput.type === "text";
+  apiKeyInput.type = showing ? "password" : "text";
+  document.getElementById("toggleKey").textContent = showing ? "Show API key" : "Hide API key";
+});
+
+imageInput.addEventListener("change", () => {
+  const file = imageInput.files && imageInput.files[0];
+  selectedFile = null;
+  preview.style.display = "none";
+  if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+  imagePreviewUrl = null;
+
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    statusBox.textContent = "Please select a valid image.";
+    imageInput.value = "";
+    return;
+  }
+  selectedFile = file;
+  imagePreviewUrl = URL.createObjectURL(file);
+  preview.src = imagePreviewUrl;
+  preview.style.display = "block";
+  statusBox.textContent = "Image selected: " + file.name;
+});
+
+analyzeBtn.addEventListener("click", async () => {
+  const apiKey = apiKeyInput.value.trim();
+  if (!apiKey) {
+    statusBox.textContent = "Please enter your API key.";
+    apiKeyInput.focus();
+    return;
+  }
+  if (!selectedFile) {
+    statusBox.textContent = "Please select an image first.";
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("file", selectedFile, selectedFile.name);
+
+  analyzeBtn.disabled = true;
+  analyzeBtn.textContent = "Analyzing...";
+  statusBox.textContent = "Sending image to Falcons AI...";
+  resultsCard.classList.add("hidden");
+
+  try {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: { "X-Api-Key": apiKey },
+      body: formData
+    });
+    const rawText = await response.text();
+    let formattedResponse;
+    try {
+      formattedResponse = JSON.stringify(JSON.parse(rawText), null, 2);
+    } catch {
+      formattedResponse = rawText || "(Empty response)";
+    }
+
+    latestResponse = "HTTP Status: " + response.status + " " + response.statusText + "\n\n" + formattedResponse;
+    resultBox.textContent = latestResponse;
+    resultsCard.classList.remove("hidden");
+    statusBox.textContent = response.ok
+      ? "Request completed successfully."
+      : "The server returned an error. Read the HTTP status and response below.";
+  } catch (error) {
+    const name = error && error.name ? error.name : "UnknownError";
+    const message = error && error.message ? error.message : String(error);
+    statusBox.textContent =
+      "REQUEST FAILED\nError type: " + name +
+      "\nDetails: " + message +
+      "\n\nPossible causes: CORS/browser restrictions, no internet, DNS/TLS failure, or the API server being unavailable. If this remains a generic fetch error, test the endpoint outside the browser or use a trusted backend proxy. This message alone cannot identify the exact cause.";
+    latestResponse = statusBox.textContent;
+    resultBox.textContent = latestResponse;
+    resultsCard.classList.remove("hidden");
+    console.error("Falcons API request failed:", error);
+  } finally {
+    analyzeBtn.disabled = false;
+    analyzeBtn.textContent = "Estimate Age";
+  }
+});
+
+document.getElementById("copyBtn").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(latestResponse);
+    statusBox.textContent = "Response copied.";
+  } catch {
+    statusBox.textContent = "Clipboard access failed. Select and copy the response manually.";
+  }
+});
+</script>
+</body>
+</html>
